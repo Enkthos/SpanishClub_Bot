@@ -1,6 +1,11 @@
+import { setDefaultResultOrder } from "node:dns";
 import { BotApp } from "./app";
 import { JsonStore } from "./store";
 import { TelegramApiError, TelegramClient, type TelegramUser } from "./telegram";
+
+// Some VPS networks advertise an unreliable IPv6 route to Telegram.
+// Prefer IPv4 while retaining IPv6 as a fallback.
+setDefaultResultOrder("ipv4first");
 
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
 if (!token) throw new Error("TELEGRAM_BOT_TOKEN is missing. Copy .env.example to .env and add a fresh BotFather token.");

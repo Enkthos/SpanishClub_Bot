@@ -67,7 +67,11 @@ echo "Removing development-only dependencies..."
 npm prune --omit=dev
 
 echo "Reloading los-barrios-bot with PM2..."
-pm2 startOrReload ecosystem.config.cjs --update-env
+if pm2 describe los-barrios-bot >/dev/null 2>&1; then
+  # Recreate the process so changes to script/interpreter paths take effect.
+  pm2 delete los-barrios-bot
+fi
+pm2 start ecosystem.config.cjs
 pm2 save
 
 echo "Deployment completed successfully."

@@ -78,7 +78,19 @@ try {
     Invoke-Checked npm.cmd prune --omit=dev
 
     Write-Host "Reloading los-barrios-bot with PM2..."
-    Invoke-Checked pm2.cmd startOrReload ecosystem.config.cjs --update-env
+    $ProcessExists = $false
+    try {
+        & pm2.cmd describe los-barrios-bot *> $null
+        $ProcessExists = $LASTEXITCODE -eq 0
+    }
+    catch {
+        $ProcessExists = $false
+    }
+    if ($ProcessExists) {
+        # Recreate the process so changes to script/interpreter paths take effect.
+        Invoke-Checked pm2.cmd delete los-barrios-bot
+    }
+    Invoke-Checked pm2.cmd start ecosystem.config.cjs
     Invoke-Checked pm2.cmd save
 
     Write-Host "Deployment completed successfully."

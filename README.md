@@ -155,7 +155,7 @@ Clone the repository, create `.env` from `.env.example`, and run the deployment
 script from the project directory. The script keeps the current `.env`, updates
 the checked-out branch from GitHub using a fast-forward-only merge, installs the
 locked dependencies, runs the checks, builds `dist/bot.js`, removes development
-dependencies, and reloads the compiled process.
+dependencies, and recreates the PM2 process from the compiled entry point.
 
 Linux:
 
