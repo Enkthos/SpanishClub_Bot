@@ -1,0 +1,172 @@
+{
+  "locale": "ru-RU",
+  "timeZone": "Europe/Moscow",
+  "event": {
+    "name": "LOS BARRIOS",
+    "meetingAt": "2026-09-12T18:00:00+03:00",
+    "location": "Место будет объявлено организатором",
+    "currentMission": {
+      "title": "La presentación",
+      "description": "Познакомься минимум с тремя людьми из других Barrios. Используй: Hola, Me llamo…, ¿Cómo te llamas?, Soy de…, Mucho gusto.",
+      "vocabulary": [
+        { "spanish": "Hola", "russian": "Привет" },
+        { "spanish": "Me llamo…", "russian": "Меня зовут…" },
+        { "spanish": "¿Cómo te llamas?", "russian": "Как тебя зовут?" },
+        { "spanish": "Soy de…", "russian": "Я из… / Я представляю…" },
+        { "spanish": "Mucho gusto", "russian": "Очень приятно" },
+        { "spanish": "¿Qué sabes?", "russian": "Что ты знаешь?" },
+        { "spanish": "No sé", "russian": "Я не знаю" }
+      ],
+      "examples": [
+        "Подойди минимум к трём игрокам из других Barrios.",
+        "Представься: «Hola. Me llamo … Soy de Los Nómadas».",
+        "Спроси имя: «¿Cómo te llamas?» и ответь «Mucho gusto».",
+        "Попробуй выяснить секретный código, используя «¿Qué sabes?».",
+        "Запомни имена собеседников и передай информацию своему Barrio."
+      ],
+      "rewardDinero": 0,
+      "rewardRespeto": 2
+    }
+  },
+  "economy": {
+    "startingPlayerDinero": 0,
+    "startingBarrioDinero": 1000,
+    "startingRespeto": 0
+  },
+  "dictionary": [
+    {
+      "title": "Приветствие и знакомство",
+      "entries": [
+        { "spanish": "Hola", "russian": "Привет" },
+        { "spanish": "Buenos días", "russian": "Доброе утро / Добрый день" },
+        { "spanish": "Buenas tardes", "russian": "Добрый вечер" },
+        { "spanish": "Me llamo…", "russian": "Меня зовут…" },
+        { "spanish": "¿Cómo te llamas?", "russian": "Как тебя зовут?" },
+        { "spanish": "Soy de…", "russian": "Я из… / Я представляю…" },
+        { "spanish": "Mucho gusto", "russian": "Очень приятно" },
+        { "spanish": "Gracias", "russian": "Спасибо" },
+        { "spanish": "Por favor", "russian": "Пожалуйста" }
+      ]
+    },
+    {
+      "title": "Основные ответы",
+      "entries": [
+        { "spanish": "Sí / No", "russian": "Да / Нет" },
+        { "spanish": "Vale", "russian": "Хорошо / Договорились" },
+        { "spanish": "No sé", "russian": "Я не знаю" },
+        { "spanish": "No entiendo", "russian": "Я не понимаю" },
+        { "spanish": "Repite, por favor", "russian": "Повтори, пожалуйста" },
+        { "spanish": "Es verdad", "russian": "Это правда" },
+        { "spanish": "Es mentira", "russian": "Это ложь" }
+      ]
+    },
+    {
+      "title": "Информация",
+      "entries": [
+        { "spanish": "¿Qué sabes?", "russian": "Что ты знаешь?" },
+        { "spanish": "Tengo información", "russian": "У меня есть информация" },
+        { "spanish": "Dime", "russian": "Скажи мне" },
+        { "spanish": "¿Dónde está…?", "russian": "Где находится…?" },
+        { "spanish": "¿Quién es?", "russian": "Кто это?" },
+        { "spanish": "Es secreto", "russian": "Это секрет" },
+        { "spanish": "No confío en ti", "russian": "Я тебе не доверяю" }
+      ]
+    },
+    {
+      "title": "Торговля и сделки",
+      "entries": [
+        { "spanish": "Quiero…", "russian": "Я хочу…" },
+        { "spanish": "Necesito…", "russian": "Мне нужно…" },
+        { "spanish": "Tengo…", "russian": "У меня есть…" },
+        { "spanish": "No tengo", "russian": "У меня нет" },
+        { "spanish": "Dame…", "russian": "Дай мне…" },
+        { "spanish": "¿Cuánto cuesta?", "russian": "Сколько это стоит?" },
+        { "spanish": "Es mucho", "russian": "Это слишком много" },
+        { "spanish": "Te doy…", "russian": "Я дам тебе…" },
+        { "spanish": "Tenemos un trato", "russian": "У нас сделка" },
+        { "spanish": "Acepto / No acepto", "russian": "Согласен / Не согласен" }
+      ]
+    },
+    {
+      "title": "Сотрудничество и конфликт",
+      "entries": [
+        { "spanish": "Necesitamos ayuda", "russian": "Нам нужна помощь" },
+        { "spanish": "Quiero hablar", "russian": "Я хочу поговорить" },
+        { "spanish": "Quiero paz", "russian": "Я хочу мира" },
+        { "spanish": "¡Paz!", "russian": "Мир!" },
+        { "spanish": "¡Guerra!", "russian": "Война!" },
+        { "spanish": "¡Policía!", "russian": "Полиция!" }
+      ]
+    },
+    {
+      "title": "Policía",
+      "entries": [
+        { "spanish": "¡Alto!", "russian": "Стой!" },
+        { "spanish": "¿Cómo te llamas?", "russian": "Как тебя зовут?" },
+        { "spanish": "¿De dónde eres?", "russian": "Откуда ты?" },
+        { "spanish": "¿Qué quieres?", "russian": "Что ты хочешь?" },
+        { "spanish": "¿Qué tienes?", "russian": "Что у тебя есть?" },
+        { "spanish": "Nada", "russian": "Ничего" }
+      ]
+    }
+  ],
+  "assignment": {
+    "activationThresholds": [
+      { "minimumBarrioPlayers": 1, "activeBarrios": 1 },
+      { "minimumBarrioPlayers": 2, "activeBarrios": 2 },
+      { "minimumBarrioPlayers": 3, "activeBarrios": 3 },
+      { "minimumBarrioPlayers": 4, "activeBarrios": 4 },
+      { "minimumBarrioPlayers": 5, "activeBarrios": 5 }
+    ],
+    "rebalanceOnlyWhenBarrioActivates": true,
+    "maximumSizeDifference": 1
+  },
+  "police": {
+    "barrioPlayersPerOfficer": 10,
+    "minimumOfficers": 1,
+    "assignmentMode": "manual"
+  },
+  "barrios": [
+    {
+      "id": "nomadas",
+      "name": "Los Nómadas",
+      "slogan": "Свобода, движение, приключения",
+      "color": "#2A9D4B",
+      "emoji": "🟢",
+      "leader": { "name": "Roma" }
+    },
+    {
+      "id": "navegantes",
+      "name": "Los Navegantes",
+      "slogan": "Информация, стратегия, интеллект",
+      "color": "#277DA1",
+      "emoji": "🔵",
+      "leader": { "name": "Давид" }
+    },
+    {
+      "id": "lumieres",
+      "name": "Las Luces (Francia)",
+      "slogan": "Стиль, юмор, дипломатия",
+      "color": "#E9C46A",
+      "emoji": "🟡",
+      "leader": { "name": "Рудик" }
+    },
+    {
+      "id": "fuegos",
+      "name": "Los Fuegos",
+      "slogan": "Энергия, риск, харизма",
+      "color": "#D62828",
+      "emoji": "🔴",
+      "leader": { "name": "Salvador", "hidePhoto": true }
+    },
+    {
+      "id": "panteras",
+      "name": "Las Panteras",
+      "slogan": "Связи, переговоры, социальная игра",
+      "color": "#7B2CBF",
+      "emoji": "🟣",
+      "leader": { "name": "Диана" }
+    }
+  ],
+  "market": []
+}
