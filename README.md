@@ -130,5 +130,51 @@ npm test
 npm run typecheck
 ```
 
+## Deployment with PM2
+
+Install PM2 once on the deployment machine:
+
+```bash
+npm install --global pm2
+```
+
+Clone the repository, create `.env` from `.env.example`, and run the deployment
+script from the project directory. The script keeps the current `.env`, updates
+the checked-out branch from GitHub using a fast-forward-only merge, installs the
+locked dependencies, runs the checks, and reloads the process.
+
+Linux:
+
+```bash
+bash scripts/deploy.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\deploy.cmd
+```
+
+The `.cmd` wrapper also works on systems where PowerShell script execution is
+disabled by the default policy.
+
+Pass a different branch name as the first argument when needed:
+
+```bash
+bash scripts/deploy.sh staging
+```
+
+Useful PM2 commands:
+
+```bash
+pm2 status
+pm2 logs los-barrios-bot
+pm2 restart los-barrios-bot
+```
+
+Run `pm2 startup` once on a Linux server if the bot should start automatically
+after a reboot. Stop any manually running copy of the bot before the first PM2
+deployment to avoid two processes polling the same Telegram token.
+
 Local secrets and runtime data are excluded by `.gitignore`. Commit
 `.env.example`, but never commit `.env` or `data/game-state.json`.
