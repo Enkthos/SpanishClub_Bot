@@ -80,6 +80,7 @@ export class TelegramClient implements Messenger {
         { command: "ranking", description: "Рейтинг Respeto" },
         { command: "map", description: "Карта территорий" },
         { command: "market", description: "Mercado" },
+        { command: "restart", description: "Удалить персонажа и начать заново" },
         { command: "myid", description: "Мой Telegram ID" },
         { command: "help", description: "Помощь" },
       ],

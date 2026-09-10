@@ -224,6 +224,31 @@ describe("Telegram conversation", () => {
     expect(messenger.messages.at(-1)?.text).toContain("Лидер barrio: <b>El Tigre</b>");
   });
 
+  it("requires code 0000 to delete a character and removes its references", async () => {
+    process.env.ADMIN_TELEGRAM_IDS = "999";
+    const { app, store, messenger } = await harness();
+    await app.handle(message(101, "El Tigre"));
+    await app.handle(message(999, "/leader nomadas | El Tigre"));
+    await app.handle(message(999, "/missionadd intro | 2026-09-20T18:00:00+03:00 | Introducción | Primera misión | Club"));
+    await app.handle(message(101, "/missionjoin intro"));
+
+    await app.handle(message(101, "🗑 Перезапустить персонажа"));
+    await app.handle(message(101, "1234"));
+    expect(store.get().players).toHaveLength(1);
+    expect(messenger.messages.at(-1)?.text).toContain("Неверный код");
+
+    await app.handle(message(101, "0000"));
+    expect(store.get().players).toHaveLength(0);
+    expect(store.get().missions[0].participantIds).not.toContain(101);
+    expect(store.get().missions[0].barrioAssignments["101"]).toBeUndefined();
+    expect(store.get().barrioLeaderIds.nomadas).toBeUndefined();
+    expect(messenger.messages.at(-1)?.text).toContain("Персонаж удалён");
+
+    await app.handle(message(101, "/start"));
+    await app.handle(message(101, "El Nuevo"));
+    expect(store.get().players[0]?.nickname).toBe("El Nuevo");
+  });
+
   it("lets an admin create, edit and delete Mercado objects", async () => {
     process.env.ADMIN_TELEGRAM_IDS = "999";
     const { app, store } = await harness();

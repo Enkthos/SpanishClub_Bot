@@ -31,6 +31,7 @@ Open `.env` and add the bot token:
 TELEGRAM_BOT_TOKEN=your_botfather_token
 ADMIN_TELEGRAM_IDS=
 BOT_DATA_FILE=./data/game-state.json
+CHARACTER_RESET_CODE=0000
 ```
 
 Start the bot:
@@ -53,6 +54,10 @@ Only one running process should use the same Telegram token.
 4. The bot assigns a barrio for that mission. Assignments are stored independently
    because attendance can change between meetings.
 5. Leave with `/missionleave MISSION_ID` if necessary.
+
+To delete a character and register again, use the
+`🗑 Перезапустить персонажа` button or send `/restart 0000`. Change
+`CHARACTER_RESET_CODE` in `.env` if a different confirmation code is needed.
 
 ## Organizer commands
 

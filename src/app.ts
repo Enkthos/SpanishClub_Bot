@@ -13,6 +13,7 @@ const MENU: ReplyMarkup = {
     [{ text: "🏆 Общий рейтинг" }, { text: "📊 Рейтинг barrios" }],
     [{ text: "🗺 Территории" }, { text: "📚 Словарь" }],
     [{ text: "📜 Правила" }],
+    [{ text: "🗑 Перезапустить персонажа" }],
   ],
   resize_keyboard: true,
 };
@@ -251,6 +252,10 @@ function parseAdminIds(): Set<number> {
   return new Set((process.env.ADMIN_TELEGRAM_IDS ?? "").split(",").map((id) => Number(id.trim())).filter(Number.isSafeInteger));
 }
 
+function characterResetCode(): string {
+  return process.env.CHARACTER_RESET_CODE?.trim() || "0000";
+}
+
 function adminHelp(): string {
   return [
     "🛠 <b>Команды организатора</b>",
@@ -279,6 +284,7 @@ function adminHelp(): string {
 export class BotApp {
   private readonly pendingLeaderPhoto = new Map<number, string>();
   private readonly pendingMapPhoto = new Set<number>();
+  private readonly pendingCharacterReset = new Set<number>();
 
   constructor(private readonly store: JsonStore, private readonly messenger: Messenger) {}
 
@@ -301,8 +307,22 @@ export class BotApp {
     }
 
     if (text === "/start") {
+      this.pendingCharacterReset.delete(userId);
       if (player) await this.messenger.sendMessage(message.chat.id, `С возвращением, ${escapeHtml(player.nickname)}!`, MENU);
       else await this.messenger.sendMessage(message.chat.id, "¡Bienvenido в LOS BARRIOS!\n\nНапишите игровой nickname (2–24 символа). Он должен быть уникальным.");
+      return;
+    }
+
+    if (this.pendingCharacterReset.has(userId)) {
+      if (text === "/cancel") {
+        this.pendingCharacterReset.delete(userId);
+        await this.messenger.sendMessage(message.chat.id, "Перезапуск отменён. Персонаж сохранён.", MENU);
+      } else if (player) {
+        await this.resetCharacter(message.chat.id, player, text);
+      } else {
+        this.pendingCharacterReset.delete(userId);
+        await this.messenger.sendMessage(message.chat.id, "Персонаж уже удалён. Отправьте /start, чтобы зарегистрироваться снова.");
+      }
       return;
     }
 
@@ -333,6 +353,14 @@ export class BotApp {
       "📚 Словарь": () => this.messenger.sendMessage(message.chat.id, dictionaryText(), MENU),
       "🎭 События": () => this.messenger.sendMessage(message.chat.id, eventsText(state, player), MENU),
       "📜 Правила": () => this.messenger.sendMessage(message.chat.id, rules(), MENU),
+      "🗑 Перезапустить персонажа": async () => {
+        this.pendingCharacterReset.add(userId);
+        await this.messenger.sendMessage(
+          message.chat.id,
+          "⚠️ Это удалит персонажа, Dinero, Respeto, инвентарь, участие в misiones и статус лидера.\n\nВведите код подтверждения или отправьте /cancel.",
+          MENU,
+        );
+      },
     };
     const action = actions[text];
     if (action) await action();
@@ -427,7 +455,7 @@ export class BotApp {
     const isAdmin = parseAdminIds().has(message.from!.id);
 
     if (command === "/help") {
-      await this.messenger.sendMessage(message.chat.id, "Команды: /start, /profile, /mission, /missions, /missionjoin, /missionleave, /events, /dictionary, /ranking, /barrios, /territories, /market, /buy, /myid" + (isAdmin ? "\n\n" + adminHelp() : ""), MENU);
+      await this.messenger.sendMessage(message.chat.id, "Команды: /start, /profile, /mission, /missions, /missionjoin, /missionleave, /events, /dictionary, /ranking, /barrios, /territories, /market, /buy, /restart, /myid" + (isAdmin ? "\n\n" + adminHelp() : ""), MENU);
       return true;
     }
     const adminOnly = new Set([
@@ -461,9 +489,40 @@ export class BotApp {
     else if (command === "/dictionary" || command === "/dict") await this.messenger.sendMessage(message.chat.id, dictionaryText(), MENU);
     else if (command === "/territories" || command === "/map") await this.showTerritories(message.chat.id);
     else if (command === "/buy") await this.buy(message.chat.id, player!, argument);
+    else if (command === "/restart") {
+      if (argument) await this.resetCharacter(message.chat.id, player!, argument);
+      else {
+        this.pendingCharacterReset.add(message.from!.id);
+        await this.messenger.sendMessage(message.chat.id, "Введите код подтверждения для удаления персонажа или отправьте /cancel.", MENU);
+      }
+    }
     else if (isAdmin) return this.handleAdmin(message.chat.id, command, argument);
     else return false;
     return true;
+  }
+
+  private async resetCharacter(chatId: number, player: Player, code: string): Promise<void> {
+    if (code !== characterResetCode()) {
+      this.pendingCharacterReset.add(player.telegramId);
+      await this.messenger.sendMessage(chatId, "Неверный код. Персонаж не удалён. Попробуйте снова или отправьте /cancel.", MENU);
+      return;
+    }
+
+    await this.store.update((state) => {
+      state.players = state.players.filter((item) => item.telegramId !== player.telegramId);
+      for (const mission of state.missions) {
+        mission.participantIds = mission.participantIds.filter((id) => id !== player.telegramId);
+        delete mission.barrioAssignments[String(player.telegramId)];
+      }
+      for (const [barrioId, leaderId] of Object.entries(state.barrioLeaderIds)) {
+        if (leaderId === player.telegramId) delete state.barrioLeaderIds[barrioId];
+      }
+    });
+    this.pendingCharacterReset.delete(player.telegramId);
+    await this.messenger.sendMessage(
+      chatId,
+      "🗑 Персонаж удалён. Отправьте /start, чтобы создать нового персонажа.",
+    );
   }
 
   private async joinMission(chatId: number, player: Player, missionId: string): Promise<void> {
