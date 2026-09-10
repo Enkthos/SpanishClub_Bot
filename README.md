@@ -37,7 +37,14 @@ CHARACTER_RESET_CODE=0000
 Start the bot:
 
 ```powershell
+npm run build
 npm start
+```
+
+For local development without building after every change:
+
+```powershell
+npm run dev
 ```
 
 Send `/myid` to the bot, copy the returned number into
@@ -133,6 +140,7 @@ thresholds, Policía ratio, economy defaults, dictionary content and timezone.
 ```powershell
 npm test
 npm run typecheck
+npm run build
 ```
 
 ## Deployment with PM2
@@ -146,7 +154,8 @@ npm install --global pm2
 Clone the repository, create `.env` from `.env.example`, and run the deployment
 script from the project directory. The script keeps the current `.env`, updates
 the checked-out branch from GitHub using a fast-forward-only merge, installs the
-locked dependencies, runs the checks, and reloads the process.
+locked dependencies, runs the checks, builds `dist/bot.js`, removes development
+dependencies, and reloads the compiled process.
 
 Linux:
 

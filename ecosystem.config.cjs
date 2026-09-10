@@ -3,9 +3,9 @@ module.exports = {
     {
       name: "los-barrios-bot",
       cwd: __dirname,
-      script: "src/bot.ts",
+      script: "dist/bot.js",
       interpreter: "node",
-      node_args: "--env-file=.env --import tsx",
+      node_args: "--env-file=.env",
       instances: 1,
       exec_mode: "fork",
       autorestart: true,

@@ -51,11 +51,20 @@ cp -- "$ENV_BACKUP" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
 echo "Installing locked dependencies..."
-npm ci
+npm ci --include=dev
 
 echo "Verifying the release..."
 npm test
 npm run typecheck
+npm run build
+
+if [[ ! -f "$PROJECT_DIR/dist/bot.js" ]]; then
+  echo "Build completed without creating dist/bot.js." >&2
+  exit 1
+fi
+
+echo "Removing development-only dependencies..."
+npm prune --omit=dev
 
 echo "Reloading los-barrios-bot with PM2..."
 pm2 startOrReload ecosystem.config.cjs --update-env

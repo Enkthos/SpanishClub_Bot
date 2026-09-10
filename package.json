@@ -7,7 +7,9 @@
     "sharp": "^0.35.4"
   },
   "scripts": {
-    "start": "node --env-file=.env --import tsx src/bot.ts",
+    "build": "esbuild ./src/bot.ts --bundle --platform=node --target=node20 --format=esm --outfile=./dist/bot.js --external:sharp",
+    "start": "node --env-file=.env dist/bot.js",
+    "dev": "node --env-file=.env --import tsx src/bot.ts",
     "pm2:start": "pm2 startOrReload ecosystem.config.cjs --update-env",
     "pm2:logs": "pm2 logs los-barrios-bot",
     "test": "vitest run --config vitest.config.ts",
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.1",
     "typescript": "5.6.3",
     "vitest": "^4.1.10"

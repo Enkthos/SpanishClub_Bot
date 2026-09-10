@@ -62,11 +62,20 @@ try {
     Copy-Item -LiteralPath $EnvBackup -Destination $EnvFile -Force
 
     Write-Host "Installing locked dependencies..."
-    Invoke-Checked npm.cmd ci
+    Invoke-Checked npm.cmd ci --include=dev
 
     Write-Host "Verifying the release..."
     Invoke-Checked npm.cmd test
     Invoke-Checked npm.cmd run typecheck
+    Invoke-Checked npm.cmd run build
+
+    $BuiltEntry = Join-Path $ProjectDir "dist/bot.js"
+    if (-not (Test-Path -LiteralPath $BuiltEntry -PathType Leaf)) {
+        throw "Build completed without creating dist/bot.js."
+    }
+
+    Write-Host "Removing development-only dependencies..."
+    Invoke-Checked npm.cmd prune --omit=dev
 
     Write-Host "Reloading los-barrios-bot with PM2..."
     Invoke-Checked pm2.cmd startOrReload ecosystem.config.cjs --update-env
