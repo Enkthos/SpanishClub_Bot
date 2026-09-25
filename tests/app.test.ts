@@ -214,6 +214,8 @@ describe("Telegram conversation", () => {
 
     const keyboard = messenger.messages.at(-1)?.replyMarkup as InlineKeyboardMarkup;
     expect(keyboard.inline_keyboard[0][0].callback_data).toBe("mission_join:intro");
+    expect(keyboard.inline_keyboard[0]).toHaveLength(1);
+    expect(keyboard.inline_keyboard[1][0].callback_data).toBe("mission_info:intro");
 
     await app.handleCallback({ id: "callback-1", from: { id: 101, first_name: "User 101" }, data: "mission_join:intro", message: { chat: { id: 101, type: "private" } } });
     expect(store.get().missions[0].participantIds).toContain(101);

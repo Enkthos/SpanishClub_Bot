@@ -183,13 +183,12 @@ function menuMissionsText(state: GameState, player: Player): string {
 }
 
 function missionKeyboard(state: GameState, player: Player): InlineKeyboardMarkup {
-  const rows = menuMissions(state)
-    .map((mission) => [
-      mission.participantIds.includes(player.telegramId)
-        ? { text: `➖ Отменить: ${mission.title}`, callback_data: `mission_leave:${mission.id}` }
-        : { text: `➕ Записаться: ${mission.title}`, callback_data: `mission_join:${mission.id}` },
-      { text: "ℹ️ Полная информация", callback_data: `mission_info:${mission.id}` },
-    ]);
+  const rows = menuMissions(state).flatMap((mission) => [
+    [mission.participantIds.includes(player.telegramId)
+      ? { text: `➖ Отменить: ${mission.title}`, callback_data: `mission_leave:${mission.id}` }
+      : { text: `➕ Записаться: ${mission.title}`, callback_data: `mission_join:${mission.id}` }],
+    [{ text: "ℹ️ Полная информация", callback_data: `mission_info:${mission.id}` }],
+  ]);
   rows.push([{ text: "🎲 Side quests", callback_data: "side:menu" }]);
   return { inline_keyboard: rows };
 }
