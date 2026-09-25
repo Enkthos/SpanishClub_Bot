@@ -34,6 +34,18 @@ export type MissionRecord = MissionState & {
   status: "draft" | "active" | "completed";
   participantIds: number[];
   barrioAssignments: Record<string, string>;
+  participantRegisteredAt: Record<string, string>;
+};
+
+export type PenaltyDefinition = { id: string; name: string; description: string };
+
+export type NotificationLog = {
+  id: string;
+  createdAt: string;
+  target: "user" | "barrio" | "mission";
+  targetId: string;
+  text: string;
+  sentCount: number;
 };
 
 export type GameEvent = {
@@ -58,6 +70,8 @@ export type GameState = {
   leaderPhotoFileIds: Record<string, string>;
   mapPhotoFileId: string | null;
   territories: Record<string, string | null>;
+  penaltyCatalog: PenaltyDefinition[];
+  notifications: NotificationLog[];
 };
 
 export function emptyState(): GameState {
@@ -73,6 +87,8 @@ export function emptyState(): GameState {
     leaderPhotoFileIds: {},
     mapPhotoFileId: null,
     territories: {},
+    penaltyCatalog: [],
+    notifications: [],
   };
 }
 
@@ -95,13 +111,16 @@ export class JsonStore {
       this.state.activeMissionId ??= null;
       this.state.events ??= [];
       this.state.barrioLeaderIds ??= {};
+      this.state.penaltyCatalog ??= [];
+      this.state.notifications ??= [];
       if (this.state.mission && this.state.missions.length === 0) {
-        this.state.missions.push({ id: "legacy", status: "active", participantIds: [], barrioAssignments: {}, ...this.state.mission });
+        this.state.missions.push({ id: "legacy", status: "active", participantIds: [], barrioAssignments: {}, participantRegisteredAt: {}, ...this.state.mission });
         this.state.activeMissionId = "legacy";
       }
       for (const mission of this.state.missions) {
         mission.participantIds ??= [];
         mission.barrioAssignments ??= {};
+        mission.participantRegisteredAt ??= Object.fromEntries(mission.participantIds.map((id) => [String(id), ""]));
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

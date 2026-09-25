@@ -194,8 +194,9 @@ describe("Telegram conversation", () => {
     await app.handle(message(101, "El Tigre"));
     await app.handle(message(202, "La Rosa"));
     await app.handle(message(303, "El Sol"));
-    await app.handle(message(999, "/missionadd day1 | 2026-09-20T18:00:00+03:00 | Día uno | Primera misión | Club"));
-    await app.handle(message(999, "/missionadd day2 | 2026-09-27T18:00:00+03:00 | Día dos | Segunda misión | Club"));
+    const meetingAt = new Date(Date.now() + 60_000).toISOString();
+    await app.handle(message(999, `/missionadd day1 | ${meetingAt} | Día uno | Primera misión | Club`));
+    await app.handle(message(999, `/missionadd day2 | ${meetingAt} | Día dos | Segunda misión | Club`));
 
     for (const id of [101, 202, 303]) await app.handle(message(id, "/missionjoin day1"));
     for (const id of [101, 202, 303]) await app.handle(message(id, "/missionjoin day2"));
@@ -214,7 +215,7 @@ describe("Telegram conversation", () => {
     const { app, store, messenger } = await harness();
     await app.handle(message(101, "El Tigre"));
     await app.handle(message(999, "/leader nomadas | El Tigre"));
-    await app.handle(message(999, "/missionadd intro | 2026-09-20T18:00:00+03:00 | Introducción | Primera misión | Club"));
+    await app.handle(message(999, `/missionadd intro | ${new Date(Date.now() + 60_000).toISOString()} | Introducción | Primera misión | Club`));
     await app.handle(message(101, "/missionjoin intro"));
     await app.handle(message(999, "/missionstart intro"));
     await app.handle(message(101, "🏘 Мой barrio"));

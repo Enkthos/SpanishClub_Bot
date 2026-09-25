@@ -7,6 +7,7 @@ The bot supports:
 
 - player registration with unique nicknames;
 - separate attendance and balanced barrio assignment for every mission;
+- mission-day registration windows (opening 10 minutes before the meeting);
 - missions with dates, vocabulary and practical examples;
 - player profiles, Dinero, Respeto, penalties and Policía status;
 - barrio leaders, rankings, Mercado items and live events;
@@ -57,7 +58,7 @@ Only one running process should use the same Telegram token.
 
 1. Send `/start` and choose a unique nickname.
 2. Open `📋 Все misiones`.
-3. Join with `/missionjoin MISSION_ID`.
+3. On the mission day, from 10 minutes before the meeting, join with `/missionjoin MISSION_ID`.
 4. The bot assigns a barrio for that mission. Assignments are stored independently
    because attendance can change between meetings.
 5. Leave with `/missionleave MISSION_ID` if necessary.
@@ -86,6 +87,27 @@ Appoint a registered player as a barrio leader:
 ```text
 /leader nomadas | El Tigre
 /leaderremove nomadas
+```
+
+Manual assignments, attendance and messages:
+
+```text
+/assign intro | El Tigre | panteras
+/missionroster intro
+/messageuser El Tigre | Tu equipo ganó la ronda.
+/messagebarrio panteras | Соберитесь у входа.
+/missionmessage intro | Результаты будут через пять минут.
+```
+
+Manage reusable penalties and issue them to a player or the current mission's
+barrio:
+
+```text
+/penaltyadd late | Опоздание | Минус 10 Respeto за опоздание.
+/penaltyedit late | Опоздание | Минус 5 Respeto за опоздание.
+/penaltylist
+/penaltysend El Tigre | late
+/penaltybarrio panteras | late
 ```
 
 Manage Mercado items:
@@ -185,6 +207,32 @@ pm2 status
 pm2 logs los-barrios-bot
 pm2 restart los-barrios-bot
 ```
+
+## Local dashboard
+
+The optional organizer dashboard runs in the same process as the bot. It shows
+users, mission attendance, manual barrio assignment, the market, reusable
+penalties, and message history. It is protected with HTTP Basic authentication
+and defaults to loopback only.
+
+Set a long unique password in the server `.env` before deployment:
+
+```dotenv
+DASHBOARD_ENABLED=true
+DASHBOARD_HOST=127.0.0.1
+DASHBOARD_PORT=3100
+DASHBOARD_PASSWORD=replace-with-a-long-random-password
+```
+
+From your own computer, open a secure SSH tunnel and then visit
+`http://localhost:3100`:
+
+```bash
+ssh -L 3100:127.0.0.1:3100 root@YOUR_SERVER_IP
+```
+
+Do not expose port 3100 directly to the internet. If `DASHBOARD_PASSWORD` is
+empty, the dashboard remains disabled.
 
 Run `pm2 startup` once on a Linux server if the bot should start automatically
 after a reboot. Stop any manually running copy of the bot before the first PM2

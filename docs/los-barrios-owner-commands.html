@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Los Barrios — команды владельца</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font-family: Arial, "Segoe UI", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.42;
+    }
+    h1 { margin: 0 0 4px; color: #172554; font-size: 24pt; }
+    .subtitle { margin: 0 0 20px; color: #64748b; font-size: 11pt; }
+    h2 {
+      margin: 20px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #dbeafe;
+      color: #1d4ed8;
+      font-size: 15pt;
+      break-after: avoid;
+    }
+    h3 { margin: 13px 0 5px; color: #334155; font-size: 11pt; break-after: avoid; }
+    p { margin: 5px 0 9px; }
+    ul { margin: 5px 0 10px 19px; padding: 0; }
+    li { margin: 3px 0; }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      color: #0f172a;
+      background: #f1f5f9;
+      border-radius: 3px;
+      padding: 1px 4px;
+    }
+    pre {
+      margin: 6px 0 11px;
+      padding: 9px 11px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      color: #e2e8f0;
+      background: #0f172a;
+      border-radius: 6px;
+      font: 9pt/1.45 Consolas, "Courier New", monospace;
+      break-inside: avoid;
+    }
+    .note {
+      margin: 11px 0 16px;
+      padding: 10px 12px;
+      border-left: 4px solid #f59e0b;
+      background: #fffbeb;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+    .item { break-inside: avoid; }
+    .item p { margin-top: 2px; color: #475569; }
+    .page-break { break-before: page; }
+    footer { margin-top: 20px; color: #94a3b8; font-size: 8.5pt; }
+  </style>
+</head>
+<body>
+  <h1>LOS BARRIOS</h1>
+  <p class="subtitle">Справочник команд владельца Telegram-бота</p>
+
+  <div class="note">
+    Telegram ID владельца должен находиться в <code>ADMIN_TELEGRAM_IDS</code> в файле
+    <code>.env</code>. Команда <code>/admin</code> показывает краткую справку внутри бота.
+  </div>
+
+  <h2>Основные команды</h2>
+  <div class="grid">
+    <div class="item"><code>/start</code><p>Регистрация или возврат в главное меню.</p></div>
+    <div class="item"><code>/myid</code><p>Показать свой Telegram ID.</p></div>
+    <div class="item"><code>/help</code><p>Общая справка.</p></div>
+    <div class="item"><code>/admin</code><p>Команды организатора.</p></div>
+    <div class="item"><code>/players</code><p>Игроки, количество Policía и рейтинг.</p></div>
+    <div class="item"><code>/profile</code><p>Персонаж, Dinero, Respeto и статусы.</p></div>
+    <div class="item"><code>/ranking</code><p>Общий рейтинг Respeto.</p></div>
+    <div class="item"><code>/barrios</code><p>Рейтинг по barrios.</p></div>
+    <div class="item"><code>/dictionary</code> / <code>/dict</code><p>Испанско-русский словарь.</p></div>
+    <div class="item"><code>/events</code><p>Активные события для игрока.</p></div>
+  </div>
+
+  <h2>Misiones</h2>
+  <pre>/mission                    Текущая misión
+/missions                   Доступные misiones
+/missionlist                Полный список для организатора</pre>
+
+  <h3>Создание и редактирование</h3>
+  <pre>/missionadd ID | ISO_DATE | TITLE | DESCRIPTION | LOCATION
+/missionedit ID | ISO_DATE | TITLE | DESCRIPTION | LOCATION
+/missiontime ID | YYYY-MM-DD | HH:MM
+/missionvocab ID | SPANISH | RUSSIAN
+/missionexample ID | EXAMPLE</pre>
+
+  <p>Пример:</p>
+  <pre>/missionadd intro | 2026-09-20T18:00:00+03:00 | La presentación | Познакомьтесь с игроками | Главный зал
+/missiontime intro | 2026-09-20 | 18:30
+/missionvocab intro | ¿Cómo te llamas? | Как тебя зовут?</pre>
+
+  <h3>Управление миссией</h3>
+  <pre>/missionstart ID
+/missionfinish ID
+/missiondelete ID
+/missionjoin ID
+/missionleave ID</pre>
+  <p><code>/missionfinish</code>, <code>/missionjoin</code> и <code>/missionleave</code> без ID используют активную misión.</p>
+
+  <h2 class="page-break">Игроки и статусы</h2>
+  <pre>/money NICKNAME AMOUNT
+/respeto NICKNAME AMOUNT
+/wanted NICKNAME LEVEL
+/penalty NICKNAME | DESCRIPTION
+/clearpenalties NICKNAME
+/police NICKNAME</pre>
+  <ul>
+    <li><code>/money</code> и <code>/respeto</code> принимают положительные и отрицательные значения.</li>
+    <li><code>/wanted</code> устанавливает уровень розыска от 0 до 3.</li>
+    <li><code>/police</code> переключает игрока между обычной ролью и Policía.</li>
+  </ul>
+
+  <h2>Лидеры barrios</h2>
+  <pre>/leader BARRIO_ID | NICKNAME
+/leaderremove BARRIO_ID</pre>
+  <p>Пример: <code>/leader nomadas | El Tigre</code></p>
+  <p>ID barrios: <code>nomadas</code>, <code>navegantes</code>, <code>lumieres</code>, <code>fuegos</code>, <code>panteras</code>.</p>
+
+  <h2>Mercado</h2>
+  <pre>/market
+/shoplist
+/shopadd ID | NAME | PRICE | STOCK/all | DESCRIPTION
+/shopedit ID | NAME | PRICE | STOCK/all | DESCRIPTION
+/shopdelete ID
+/buy ID</pre>
+  <p>Пример: <code>/shopadd llave | Llave | 300 | 5 | Открывает одну дверь</code></p>
+
+  <h2>Игровые события</h2>
+  <pre>/eventlist
+/eventpreset rata | TARGET
+/eventpreset robo | TARGET
+/eventpreset guerra | TARGET
+/eventadd ID | TYPE | TITLE | DESCRIPTION | TARGET
+/eventedit ID | TYPE | TITLE | DESCRIPTION | TARGET
+/eventstart ID
+/eventfinish ID
+/eventdelete ID</pre>
+  <p>Типы: <code>la_rata</code>, <code>robo</code>, <code>guerra</code>, <code>custom</code>.</p>
+  <p>Цели: <code>all</code>, <code>police</code>, nickname, ID barrio или список через запятую.</p>
+
+  <h2 class="page-break">Территории и карта</h2>
+  <pre>/map
+/territories
+/win BARRIO_ID
+/territoryremove BARRIO_ID
+/territoryremove ZONE_NUMBER</pre>
+  <ul>
+    <li><code>/win nomadas</code> выдаёт barrio новую территорию.</li>
+    <li><code>/territoryremove nomadas</code> убирает случайную территорию barrio.</li>
+    <li><code>/territoryremove 5</code> освобождает конкретную зону.</li>
+  </ul>
+
+  <h2>Изображения</h2>
+  <pre>/leaderphoto BARRIO_ID
+/mapphoto</pre>
+  <p>После команды отправьте нужное изображение как фотографию в Telegram.</p>
+
+  <h2>Удаление персонажа</h2>
+  <pre>/restart 0000</pre>
+  <p>Удаляет профиль, Dinero, Respeto, инвентарь, участие в misiones и статус лидера. После удаления используйте <code>/start</code>.</p>
+  <p>Код настраивается переменной <code>CHARACTER_RESET_CODE</code> в <code>.env</code>.</p>
+
+  <footer>Los Barrios Bot · Owner command reference</footer>
+</body>
+</html>

@@ -106,6 +106,29 @@ function missionSchedule(meetingAt: string): string {
   return `${day}, ${time}`;
 }
 
+type RegistrationWindow = "upcoming" | "open" | "closed";
+
+function localMissionDay(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: gameConfig.timeZone,
+  }).format(date);
+}
+
+function registrationWindow(mission: MissionRecord, now = new Date()): RegistrationWindow {
+  const meeting = new Date(mission.meetingAt);
+  if (Number.isNaN(meeting.getTime())) return "closed";
+  const opensAt = meeting.getTime() - 10 * 60_000;
+  if (now.getTime() < opensAt) return "upcoming";
+  return localMissionDay(now) === localMissionDay(meeting) ? "open" : "closed";
+}
+
+function registrationHint(mission: MissionRecord): string {
+  const window = registrationWindow(mission);
+  if (window === "open") return "🟢 Запись открыта до конца дня";
+  if (window === "upcoming") return `🕒 Запись откроется за 10 минут: ${missionSchedule(new Date(new Date(mission.meetingAt).getTime() - 10 * 60_000).toISOString())}`;
+  return "⚫ Запись закрыта";
+}
+
 function missionDateTime(date: string, time: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
   const candidate = new Date(`${date}T${time}:00Z`);
@@ -131,7 +154,7 @@ function missionsText(state: GameState, includeCompleted = false, player?: Playe
     ...(mission.location ? [`📍 ${escapeHtml(mission.location)}`] : []),
     ...(player ? [mission.participantIds.includes(player.telegramId)
       ? `✅ Вы участвуете · ${barrioLabel(mission.barrioAssignments[String(player.telegramId)] ?? null)}`
-      : "➕ Вы ещё не записаны"] : []),
+      : `➕ Вы ещё не записаны\n${registrationHint(mission)}`] : []),
     `<code>${escapeHtml(mission.id)}</code>`,
   ].join("\n"));
   const adminHint = includeCompleted
@@ -263,6 +286,9 @@ function adminHelp(): string {
     "/missionlist, /missionadd, /missionedit, /missionstart, /missionfinish, /missiondelete",
     "/missiontime ID | ГГГГ-ММ-ДД | ЧЧ:ММ — установить дату и время",
     "/missionvocab, /missionexample — наполнить misión",
+    "/assign [MISSION_ID |] НИК | ID_BARRIO — вручную назначить команду",
+    "/missionroster [ID] — список записанных на misión",
+    "/messageuser НИК | ТЕКСТ, /messagebarrio ID_BARRIO | ТЕКСТ, /missionmessage [ID |] ТЕКСТ",
     "/leader ID_BARRIO | НИК — назначить игрока лидером barrio",
     "/leaderremove ID_BARRIO — снять лидера",
     "/eventlist, /eventadd, /eventedit, /eventstart, /eventfinish, /eventdelete",
@@ -271,6 +297,8 @@ function adminHelp(): string {
     "/respeto НИК СУММА — изменить Respeto",
     "/wanted НИК УРОВЕНЬ — 0 снимает розыск",
     "/penalty НИК | ТЕКСТ — добавить Penitencia",
+    "/penaltylist, /penaltyadd, /penaltyedit, /penaltydelete — каталог Penitencias",
+    "/penaltysend НИК | ID, /penaltybarrio ID_BARRIO | ID — выдать из каталога",
     "/clearpenalties НИК",
     "/police НИК — включить/выключить роль Policía",
     "/shoplist, /shopadd, /shopedit, /shopdelete",
@@ -460,6 +488,8 @@ export class BotApp {
     }
     const adminOnly = new Set([
       "/admin", "/players", "/money", "/respeto", "/wanted", "/penalty", "/clearpenalties", "/police",
+      "/assign", "/missionroster", "/messageuser", "/messagebarrio", "/missionmessage",
+      "/penaltylist", "/penaltyadd", "/penaltyedit", "/penaltydelete", "/penaltysend", "/penaltybarrio",
       "/shoplist", "/shopadd", "/shopedit", "/shopdelete",
       "/missionlist", "/missionadd", "/missionedit", "/missiontime", "/missionstart", "/missionfinish", "/missiondelete", "/missionvocab", "/missionexample",
       "/eventlist", "/eventadd", "/eventedit", "/eventstart", "/eventfinish", "/eventdelete", "/eventpreset",
@@ -513,6 +543,7 @@ export class BotApp {
       for (const mission of state.missions) {
         mission.participantIds = mission.participantIds.filter((id) => id !== player.telegramId);
         delete mission.barrioAssignments[String(player.telegramId)];
+        delete mission.participantRegisteredAt[String(player.telegramId)];
       }
       for (const [barrioId, leaderId] of Object.entries(state.barrioLeaderIds)) {
         if (leaderId === player.telegramId) delete state.barrioLeaderIds[barrioId];
@@ -540,6 +571,10 @@ export class BotApp {
       await this.messenger.sendMessage(chatId, "Эта misión уже завершена.", MENU);
       return;
     }
+    if (registrationWindow(mission) !== "open") {
+      await this.messenger.sendMessage(chatId, `${registrationHint(mission)}. Записаться можно только в день misión, начиная за 10 минут до встречи.`, MENU);
+      return;
+    }
     if (mission.participantIds.includes(player.telegramId)) {
       await this.messenger.sendMessage(chatId, `Вы уже участвуете в этой misión: ${barrioLabel(mission.barrioAssignments[String(player.telegramId)] ?? null)}.`, MENU);
       return;
@@ -549,6 +584,7 @@ export class BotApp {
     await this.store.update(() => {
       mission.participantIds.push(player.telegramId);
       mission.barrioAssignments[String(player.telegramId)] = barrioId;
+      mission.participantRegisteredAt[String(player.telegramId)] = new Date().toISOString();
     });
     await this.messenger.sendMessage(
       chatId,
@@ -571,6 +607,7 @@ export class BotApp {
     await this.store.update(() => {
       mission.participantIds = mission.participantIds.filter((id) => id !== player.telegramId);
       delete mission.barrioAssignments[String(player.telegramId)];
+      delete mission.participantRegisteredAt[String(player.telegramId)];
     });
     await this.messenger.sendMessage(chatId, `Вы отменили участие в <b>${escapeHtml(mission.title)}</b>.`, MENU);
   }
@@ -589,6 +626,35 @@ export class BotApp {
     await this.messenger.sendMessage(chatId, `Покупка совершена: ${escapeHtml(item.name)}. Осталось ${player.dinero} Dinero.`, MENU);
   }
 
+  private async notifyPlayers(target: "user" | "barrio" | "mission", targetId: string, players: Player[], text: string): Promise<number> {
+    let sentCount = 0;
+    for (const player of players) {
+      try {
+        await this.messenger.sendMessage(player.chatId, `📣 <b>LOS BARRIOS</b>\n${escapeHtml(text)}`, MENU);
+        sentCount += 1;
+      } catch (error) {
+        console.error(`Could not notify ${player.telegramId}:`, error);
+      }
+    }
+    await this.store.update((state) => {
+      state.notifications.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString(), target, targetId, text, sentCount });
+      state.notifications.splice(250);
+    });
+    return sentCount;
+  }
+
+  private missionRoster(mission: MissionRecord, state: GameState): string {
+    const participants = mission.participantIds
+      .map((id) => findPlayer(state, id))
+      .filter((player): player is Player => Boolean(player));
+    const lines = gameConfig.barrios.map((barrio) => {
+      const names = participants.filter((player) => mission.barrioAssignments[String(player.telegramId)] === barrio.id)
+        .map((player) => escapeHtml(player.nickname));
+      return `${barrio.emoji} <b>${escapeHtml(barrio.name)}</b>: ${names.join(", ") || "—"}`;
+    });
+    return [`👥 <b>${escapeHtml(mission.title)}</b>`, `Записано: ${participants.length}`, "", ...lines].join("\n");
+  }
+
   private async handleAdmin(chatId: number, command: string, argument: string): Promise<boolean> {
     const state = this.store.get();
     if (command === "/admin") {
@@ -599,6 +665,105 @@ export class BotApp {
       const barrioPlayers = state.players.filter((p) => p.role === "player").length;
       const police = state.players.filter((p) => p.role === "police").length;
       await this.messenger.sendMessage(chatId, `Участники: ${state.players.length}\nВ barrios: ${barrioPlayers}\nPolicía: ${police}/${requiredPoliceCount(barrioPlayers, gameConfig)}\n\n${generalRanking(state)}`);
+      return true;
+    }
+    if (command === "/missionroster") {
+      const mission = state.missions.find((item) => item.id === (argument || state.activeMissionId));
+      await this.messenger.sendMessage(chatId, mission ? this.missionRoster(mission, state) : "Misión не найдена. Формат: /missionroster ID");
+      return true;
+    }
+    if (command === "/assign") {
+      const parts = argument.split("|").map((value) => value.trim());
+      const [missionId, nickname, barrioId] = parts.length === 3
+        ? parts
+        : [state.activeMissionId ?? "", parts[0] ?? "", parts[1] ?? ""];
+      const mission = state.missions.find((item) => item.id === missionId);
+      const target = findByNickname(state, nickname);
+      const barrio = gameConfig.barrios.find((item) => item.id === barrioId);
+      if (!mission || !target || !barrio || !mission.participantIds.includes(target.telegramId)) {
+        await this.messenger.sendMessage(chatId, "Формат: /assign [MISSION_ID |] НИК | ID_BARRIO\nИгрок должен быть записан на misión.");
+        return true;
+      }
+      await this.store.update(() => { mission.barrioAssignments[String(target.telegramId)] = barrio.id; });
+      await this.messenger.sendMessage(chatId, `${escapeHtml(target.nickname)} назначен в ${barrioLabel(barrio.id)} для misión ${escapeHtml(mission.id)}.`);
+      await this.messenger.sendMessage(target.chatId, `🏘 Организатор назначил вам barrio для misión «${escapeHtml(mission.title)}»: ${barrioLabel(barrio.id)}.`, MENU);
+      return true;
+    }
+    if (command === "/messageuser" || command === "/messagebarrio" || command === "/missionmessage") {
+      const [first, ...rest] = argument.split("|").map((value) => value.trim());
+      let recipients: Player[] = [];
+      let target: "user" | "barrio" | "mission" = "user";
+      let targetId = first ?? "";
+      let text = rest.join(" | ");
+      if (command === "/messageuser") {
+        const player = findByNickname(state, first ?? "");
+        recipients = player ? [player] : [];
+      } else {
+        const mission = state.missions.find((item) => item.id === (command === "/missionmessage" && rest.length > 0 ? first : state.activeMissionId));
+        if (command === "/missionmessage" && rest.length === 0) { text = first ?? ""; targetId = mission?.id ?? ""; }
+        if (command === "/missionmessage" && rest.length > 0) { text = rest.join(" | "); targetId = first ?? ""; }
+        if (command === "/messagebarrio") {
+          target = "barrio";
+          if (!gameConfig.barrios.some((item) => item.id === first)) recipients = [];
+          else recipients = mission ? mission.participantIds.map((id) => findPlayer(state, id)).filter((player): player is Player => Boolean(player) && mission.barrioAssignments[String(player!.telegramId)] === first) : [];
+        } else {
+          target = "mission";
+          recipients = mission ? mission.participantIds.map((id) => findPlayer(state, id)).filter((player): player is Player => Boolean(player)) : [];
+        }
+      }
+      if (!text || !recipients.length) {
+        await this.messenger.sendMessage(chatId, command === "/messageuser" ? "Формат: /messageuser НИК | ТЕКСТ" : command === "/messagebarrio" ? "Формат: /messagebarrio ID_BARRIO | ТЕКСТ (только участникам текущей misión)" : "Формат: /missionmessage [ID |] ТЕКСТ");
+        return true;
+      }
+      const sent = await this.notifyPlayers(target, targetId, recipients, text);
+      await this.messenger.sendMessage(chatId, `Сообщение отправлено: ${sent}/${recipients.length}.`);
+      return true;
+    }
+    if (command === "/penaltylist") {
+      const items = state.penaltyCatalog.map((item) => `<code>${escapeHtml(item.id)}</code> — <b>${escapeHtml(item.name)}</b>\n${escapeHtml(item.description)}`);
+      await this.messenger.sendMessage(chatId, items.length ? `⚠️ <b>Каталог Penitencias</b>\n\n${items.join("\n\n")}` : "Каталог Penitencias пока пуст. Добавьте: /penaltyadd ID | НАЗВАНИЕ | ОПИСАНИЕ");
+      return true;
+    }
+    if (command === "/penaltyadd" || command === "/penaltyedit") {
+      const [id, name, description] = argument.split("|").map((value) => value.trim());
+      const existing = state.penaltyCatalog.find((item) => item.id === id);
+      if (!id || !name || !description || (command === "/penaltyadd" && existing) || (command === "/penaltyedit" && !existing)) {
+        await this.messenger.sendMessage(chatId, `Формат: ${command} ID | НАЗВАНИЕ | ОПИСАНИЕ`);
+        return true;
+      }
+      await this.store.update((s) => {
+        if (existing) Object.assign(existing, { id, name, description });
+        else s.penaltyCatalog.push({ id, name, description });
+      });
+      await this.messenger.sendMessage(chatId, existing ? "Penitencia изменена." : "Penitencia добавлена в каталог.");
+      return true;
+    }
+    if (command === "/penaltydelete") {
+      const index = state.penaltyCatalog.findIndex((item) => item.id === argument);
+      if (index < 0) await this.messenger.sendMessage(chatId, "Penitencia не найдена.");
+      else {
+        await this.store.update((s) => { s.penaltyCatalog.splice(index, 1); });
+        await this.messenger.sendMessage(chatId, "Penitencia удалена из каталога. Уже выданные записи у игроков сохранены.");
+      }
+      return true;
+    }
+    if (command === "/penaltysend" || command === "/penaltybarrio") {
+      const [targetId, penaltyId] = argument.split("|").map((value) => value.trim());
+      const penalty = state.penaltyCatalog.find((item) => item.id === penaltyId);
+      const mission = activeMission(state);
+      const recipients = command === "/penaltysend"
+        ? [findByNickname(state, targetId)].filter((player): player is Player => Boolean(player))
+        : mission && gameConfig.barrios.some((item) => item.id === targetId)
+          ? mission.participantIds.map((id) => findPlayer(state, id)).filter((player): player is Player => Boolean(player) && mission.barrioAssignments[String(player!.telegramId)] === targetId)
+          : [];
+      if (!penalty || !recipients.length) {
+        await this.messenger.sendMessage(chatId, command === "/penaltysend" ? "Формат: /penaltysend НИК | ID_ШТРАФА" : "Формат: /penaltybarrio ID_BARRIO | ID_ШТРАФА (для текущей misión)");
+        return true;
+      }
+      const entry = `${penalty.name}: ${penalty.description}`;
+      await this.store.update(() => { for (const player of recipients) player.penalties.push(entry); });
+      for (const player of recipients) await this.messenger.sendMessage(player.chatId, `🚨 Новая Penitencia: <b>${escapeHtml(penalty.name)}</b>\n${escapeHtml(penalty.description)}`, MENU);
+      await this.messenger.sendMessage(chatId, `Penitencia выдана: ${recipients.length} игрокам.`);
       return true;
     }
     if (command === "/leader") {
@@ -791,6 +956,7 @@ export class BotApp {
             for (const mission of s.missions) {
               mission.participantIds = mission.participantIds.filter((id) => id !== target.telegramId);
               delete mission.barrioAssignments[String(target.telegramId)];
+              delete mission.participantRegisteredAt[String(target.telegramId)];
             }
           });
         } else {
@@ -856,6 +1022,7 @@ export class BotApp {
           rewardRespeto: existing?.rewardRespeto,
           participantIds: existing?.participantIds ?? [],
           barrioAssignments: existing?.barrioAssignments ?? {},
+          participantRegisteredAt: existing?.participantRegisteredAt ?? {},
         };
         if (existing) Object.assign(existing, record);
         else s.missions.push(record);

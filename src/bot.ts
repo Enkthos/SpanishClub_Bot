@@ -1,5 +1,6 @@
 import { setDefaultResultOrder } from "node:dns";
 import { BotApp } from "./app";
+import { startDashboard } from "./dashboard";
 import { JsonStore } from "./store";
 import { TelegramApiError, TelegramClient, type TelegramUser } from "./telegram";
 
@@ -40,6 +41,7 @@ const store = new JsonStore(process.env.BOT_DATA_FILE ?? "./data/game-state.json
 await store.load();
 const telegram = new TelegramClient(token);
 const app = new BotApp(store, telegram);
+startDashboard(store, telegram);
 
 let me: TelegramUser | undefined;
 let startupFailures = 0;
