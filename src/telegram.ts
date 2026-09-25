@@ -12,9 +12,17 @@ export type TelegramMessage = {
   photo?: { file_id: string; width: number; height: number; file_size?: number }[];
 };
 
+export type TelegramCallbackQuery = {
+  id: string;
+  from: TelegramUser;
+  data?: string;
+  message?: { chat: { id: number; type: string } };
+};
+
 export type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 };
 
 type ApiResponse<T> = { ok: boolean; result: T; description?: string; error_code?: number };
@@ -31,10 +39,17 @@ export type ReplyMarkup = {
   resize_keyboard: true;
 };
 
+export type InlineKeyboardMarkup = {
+  inline_keyboard: { text: string; callback_data: string }[][];
+};
+
+export type MessageMarkup = ReplyMarkup | InlineKeyboardMarkup;
+
 export interface Messenger {
-  sendMessage(chatId: number, text: string, replyMarkup?: ReplyMarkup): Promise<void>;
+  sendMessage(chatId: number, text: string, replyMarkup?: MessageMarkup): Promise<void>;
   sendPhoto(chatId: number, photo: string | Uint8Array, caption: string): Promise<void>;
   downloadFile(fileId: string): Promise<Uint8Array>;
+  answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void>;
 }
 
 export class TelegramClient implements Messenger {
@@ -91,17 +106,21 @@ export class TelegramClient implements Messenger {
     return this.call("getUpdates", {
       offset,
       timeout: 30,
-      allowed_updates: ["message"],
+      allowed_updates: ["message", "callback_query"],
     });
   }
 
-  async sendMessage(chatId: number, text: string, replyMarkup?: ReplyMarkup): Promise<void> {
+  async sendMessage(chatId: number, text: string, replyMarkup?: MessageMarkup): Promise<void> {
     await this.call("sendMessage", {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
+  }
+
+  async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+    await this.call("answerCallbackQuery", { callback_query_id: callbackQueryId, ...(text ? { text } : {}) });
   }
 
   async sendPhoto(chatId: number, photo: string | Uint8Array, caption: string): Promise<void> {

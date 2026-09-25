@@ -2,18 +2,14 @@ import { activeBarrioCount, assignPlayer, requiredPoliceCount } from "./assignme
 import { gameConfig } from "./config";
 import { formatMission } from "./mission";
 import { JsonStore, nicknameKey, type GameEvent, type GameState, type MissionRecord, type Player } from "./store";
-import type { Messenger, ReplyMarkup, TelegramMessage } from "./telegram";
+import type { InlineKeyboardMarkup, Messenger, ReplyMarkup, TelegramCallbackQuery, TelegramMessage } from "./telegram";
 import { renderTerritoryMap } from "./territory-map";
 
 const MENU: ReplyMarkup = {
   keyboard: [
-    [{ text: "👤 Мой персонаж" }, { text: "🎯 Текущая misión" }],
-    [{ text: "📋 Все misiones" }, { text: "🎭 События" }],
-    [{ text: "🏘 Мой barrio" }, { text: "🛒 Mercado" }],
-    [{ text: "🏆 Общий рейтинг" }, { text: "📊 Рейтинг barrios" }],
-    [{ text: "🗺 Территории" }, { text: "📚 Словарь" }],
-    [{ text: "📜 Правила" }],
-    [{ text: "🗑 Перезапустить персонажа" }],
+    [{ text: "👤 Мой персонаж" }, { text: "📋 Misiones" }],
+    [{ text: "📊 Ratings" }, { text: "📚 Словарь" }],
+    [{ text: "ℹ️ Информация" }, { text: "⚙️ Настройки" }],
   ],
   resize_keyboard: true,
 };
@@ -43,8 +39,10 @@ function activeMission(state: GameState): MissionRecord | undefined {
 
 function playerBarrioId(state: GameState, player: Player): string | null {
   const mission = activeMission(state);
-  if (!mission) return player.barrioId;
-  return mission.barrioAssignments[String(player.telegramId)] ?? null;
+  const appointed = Object.entries(state.barrioLeaderIds)
+    .find(([, telegramId]) => telegramId === player.telegramId)?.[0] ?? null;
+  if (!mission) return appointed ?? player.barrioId;
+  return mission.barrioAssignments[String(player.telegramId)] ?? appointed;
 }
 
 function barrioLabel(id: string | null): string {
@@ -58,12 +56,12 @@ function profile(player: Player, state: GameState): string {
   const role = player.role === "police" ? "👮 Policía" : barrioLabel(currentBarrioId);
   const penalties = player.penalties.length ? player.penalties.map(escapeHtml).join("; ") : "нет";
   const wanted = player.wantedLevel > 0 ? `уровень ${player.wantedLevel}` : "нет";
-  const barrioMoney = currentBarrioId ? state.barrioDinero[currentBarrioId] ?? 0 : null;
+  const barrioMoney = currentBarrioId ? state.barrioMoney[currentBarrioId] ?? 0 : null;
   return [
     `👤 <b>${escapeHtml(player.nickname)}</b>`,
     `🏘 Команда: ${role}`,
     `💵 Dinero: ${player.dinero}`,
-    ...(barrioMoney === null ? [] : [`🏦 Казна barrio: ${barrioMoney} Barrio$`]),
+    ...(barrioMoney === null ? [] : [`🏦 Казна barrio: ${barrioMoney} Dinero`]),
     `⭐ Respeto: ${player.respeto}`,
     `⚠️ Penitencia: ${penalties}`,
     `🚨 Розыск Policía: ${wanted}`,
@@ -71,18 +69,22 @@ function profile(player: Player, state: GameState): string {
 }
 
 function missionText(state: GameState): string {
-  const configured = gameConfig.event.currentMission;
   const active = state.missions.find((mission) => mission.id === state.activeMissionId);
-  const mission = active ?? state.mission ?? {
-    ...configured,
-    meetingAt: gameConfig.event.meetingAt,
-    location: gameConfig.event.location,
-  };
+  if (!active) return "Активная misión не выбрана. Откройте /missions или попросите организатора выбрать текущую misión.";
   return formatMission(
-    { ...mission, meetingAt: new Date(mission.meetingAt) },
+    { ...active, meetingAt: new Date(active.meetingAt) },
     gameConfig.locale,
     gameConfig.timeZone,
   );
+}
+
+function menuMissions(state: GameState): MissionRecord[] {
+  const current = state.missions.filter((mission) => mission.status === "active");
+  if (current.length) return current;
+  return [...state.missions]
+    .filter((mission) => mission.status === "completed")
+    .sort((a, b) => Date.parse(b.meetingAt) - Date.parse(a.meetingAt))
+    .slice(0, 1);
 }
 
 function missionStatus(status: MissionRecord["status"]): string {
@@ -166,6 +168,36 @@ function missionsText(state: GameState, includeCompleted = false, player?: Playe
   return ["📋 <b>Misiones</b>", ...lines, ...playerHint, ...adminHint].join("\n\n");
 }
 
+function menuMissionsText(state: GameState, player: Player): string {
+  const missions = menuMissions(state);
+  if (!missions.length) return "📋 Сейчас нет активной или предыдущей misión.";
+  const lines = missions.map((mission) => [
+    `${missionStatus(mission.status)} · <b>${escapeHtml(mission.title)}</b>`,
+    `📅 ${missionSchedule(mission.meetingAt)}`,
+    ...(mission.location ? [`📍 ${escapeHtml(mission.location)}`] : []),
+    mission.participantIds.includes(player.telegramId)
+      ? `✅ Вы участвуете · ${barrioLabel(mission.barrioAssignments[String(player.telegramId)] ?? null)}`
+      : `➕ Вы ещё не записаны\n${registrationHint(mission)}`,
+  ].join("\n"));
+  return ["📋 <b>Misiones</b>", ...lines, "Нажмите кнопку ниже, чтобы записаться или отменить участие."].join("\n\n");
+}
+
+function missionKeyboard(state: GameState, player: Player): InlineKeyboardMarkup {
+  const rows = menuMissions(state)
+    .map((mission) => mission.participantIds.includes(player.telegramId)
+      ? [{ text: `➖ Отменить: ${mission.title}`, callback_data: `mission_leave:${mission.id}` }]
+      : [{ text: `➕ Записаться: ${mission.title}`, callback_data: `mission_join:${mission.id}` }]);
+  rows.push([{ text: "🎲 Side quests", callback_data: "side:menu" }]);
+  return { inline_keyboard: rows };
+}
+
+function characterKeyboard(): InlineKeyboardMarkup {
+  return { inline_keyboard: [[
+    { text: "🏘 Мой barrio", callback_data: "character:barrio" },
+    { text: "🗺 Территории", callback_data: "character:territories" },
+  ]] };
+}
+
 function assignMissionBarrio(state: GameState, mission: MissionRecord, player: Player): string {
   const appointed = Object.entries(state.barrioLeaderIds)
     .find(([, telegramId]) => telegramId === player.telegramId)?.[0];
@@ -232,27 +264,103 @@ function barrioRanking(state: GameState): string {
   return sections.join("\n\n");
 }
 
-function rules(): string {
+function defaultRules(): string {
   return [
     "📜 <b>LOS BARRIOS</b>",
     "Главная цель — после семи misiones набрать больше всего Respeto.",
     "Во время ключевых взаимодействий используйте выданные испанские фразы. Ошибаться можно — главное говорить.",
-    "Barrio$ можно тратить, передавать и использовать в разрешённых сделках.",
+    "Dinero можно тратить, передавать и использовать в разрешённых сделках.",
     "Policía может остановить игрока командой ¡Alto! и назначить Penitencia по правилам игры.",
   ].join("\n\n");
 }
 
 function marketText(state: GameState): string {
   if (!state.market.length) return "🛒 Mercado пока закрыт. Организатор ещё не добавил товары.";
-  return ["🛒 <b>Mercado</b>", ...state.market.map((item) => `${escapeHtml(item.id)} — <b>${escapeHtml(item.name)}</b>: ${item.price} Barrio$${item.stock === null ? "" : ` (осталось ${item.stock})`}\n${escapeHtml(item.description)}`), "", "Для покупки: /buy ID_ТОВАРА"].join("\n");
+  return ["🛒 <b>Mercado</b>", ...state.market.map((item) => `${escapeHtml(item.id)} — <b>${escapeHtml(item.name)}</b>: ${item.price} Dinero${item.stock === null ? "" : ` (осталось ${item.stock})`}\n${escapeHtml(item.description)}`), "", "Для покупки: /buy ID_ТОВАРА"].join("\n");
 }
 
-function dictionaryText(): string {
+function basicsText(): string {
   const sections = gameConfig.dictionary.map((section) => [
     `<b>${escapeHtml(section.title)}</b>`,
     ...section.entries.map((entry) => `• ${escapeHtml(entry.spanish)} — ${escapeHtml(entry.russian)}`),
   ].join("\n"));
-  return ["📚 <b>Diccionario LOS BARRIOS</b>", "Самые полезные слова и фразы для игры:", "", ...sections].join("\n\n");
+  return ["📘 <b>Basics</b>", "Базовые слова и фразы для игры:", ...sections].join("\n\n");
+}
+
+function dictionaryText(state: GameState): string {
+  const missions = state.missions.filter((mission) => mission.vocabulary?.length);
+  return [
+    "📚 <b>Diccionario LOS BARRIOS</b>",
+    "Выберите Basics или vocabulary конкретной misión:",
+    missions.length ? "🎯 Миссии доступны ниже." : "Организатор ещё не добавил vocabulary к миссиям.",
+  ].join("\n\n");
+}
+
+function vocabularyKeyboard(state: GameState): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: state.missions
+      .filter((mission) => mission.vocabulary?.length || mission.phrases?.length)
+      .reduce((rows, mission) => rows.concat([[{ text: `🎯 ${mission.title}`, callback_data: `vocab:${mission.id}` }]]), [[{ text: "📘 Basics", callback_data: "vocab:basics" }]]),
+  };
+}
+
+function ratingsKeyboard(): InlineKeyboardMarkup {
+  return { inline_keyboard: [[
+    { text: "🏆 Общий рейтинг", callback_data: "ratings:general" },
+    { text: "📊 Рейтинг barrios", callback_data: "ratings:barrios" },
+  ]] };
+}
+
+function sideQuestsKeyboard(): InlineKeyboardMarkup {
+  return { inline_keyboard: [[
+    { text: "🎭 События", callback_data: "side:events" },
+    { text: "🛒 Mercado", callback_data: "side:market" },
+  ]] };
+}
+
+function settingsKeyboard(): InlineKeyboardMarkup {
+  return { inline_keyboard: [[{ text: "🗑 Перезапустить персонажа", callback_data: "settings:reset" }]] };
+}
+
+function informationText(state: GameState): string {
+  const information = state.botInformation?.trim()
+    ? escapeHtml(state.botInformation.trim())
+    : "Игровой бот для misiones, barrios, событий, торговли и территорий.";
+  const rules = state.botRules?.trim() ? escapeHtml(state.botRules.trim()) : defaultRules();
+  return [
+    "ℹ️ <b>LOS BARRIOS</b>",
+    information,
+    "Выбирайте разделы кнопками меню. Запись на misión и отмена участия доступны внутри раздела Misiones.",
+    "",
+    rules,
+  ].join("\n\n");
+}
+
+function missionVocabularyText(mission: MissionRecord): string {
+  const words = mission.vocabulary ?? [];
+  return [
+    `📚 <b>Vocabulary: ${escapeHtml(mission.title)}</b>`,
+    words.length ? words.map((entry) => `• ${escapeHtml(entry.spanish)} — ${escapeHtml(entry.russian)}`).join("\n") : "Для этой misión vocabulary пока не добавлен.",
+  ].join("\n\n");
+}
+
+function missionPhrasesText(mission: MissionRecord): string {
+  const phrases = mission.phrases ?? [];
+  return [
+    `💬 <b>Phrases: ${escapeHtml(mission.title)}</b>`,
+    phrases.length ? phrases.map((phrase) => [
+      `• ${escapeHtml(phrase.text)}`,
+      ...(phrase.translation ? [`Перевод: ${escapeHtml(phrase.translation)}`] : []),
+      ...(phrase.notes ? [`Примечание: ${escapeHtml(phrase.notes)}`] : []),
+    ].join("\n")).join("\n\n") : "Для этой misión phrases пока не добавлены.",
+  ].join("\n\n");
+}
+
+function missionVocabularyKeyboard(mission: MissionRecord): InlineKeyboardMarkup {
+  return { inline_keyboard: [[
+    { text: "🔤 Words", callback_data: `vocab_words:${mission.id}` },
+    { text: "💬 Phrases", callback_data: `vocab_phrases:${mission.id}` },
+  ]] };
 }
 
 function territoryText(state: GameState): string {
@@ -313,6 +421,7 @@ export class BotApp {
   private readonly pendingLeaderPhoto = new Map<number, string>();
   private readonly pendingMapPhoto = new Set<number>();
   private readonly pendingCharacterReset = new Set<number>();
+  private readonly pendingRegistrationUsername = new Map<number, string>();
 
   constructor(private readonly store: JsonStore, private readonly messenger: Messenger) {}
 
@@ -337,8 +446,25 @@ export class BotApp {
     if (text === "/start") {
       this.pendingCharacterReset.delete(userId);
       if (player) await this.messenger.sendMessage(message.chat.id, `С возвращением, ${escapeHtml(player.nickname)}!`, MENU);
-      else await this.messenger.sendMessage(message.chat.id, "¡Bienvenido в LOS BARRIOS!\n\nНапишите игровой nickname (2–24 символа). Он должен быть уникальным.");
+      else {
+        this.pendingRegistrationUsername.set(userId, "");
+        await this.messenger.sendMessage(message.chat.id, "¡Bienvenido в LOS BARRIOS!\n\nВведите username одним словом: только буквы, цифры и _. Затем бот попросит настоящее имя.");
+      }
       return;
+    }
+
+    if (!player && this.pendingRegistrationUsername.has(userId) && text === "/cancel") {
+      this.pendingRegistrationUsername.delete(userId);
+      await this.messenger.sendMessage(message.chat.id, "Регистрация отменена. Отправьте /start, чтобы начать снова.");
+      return;
+    }
+
+    if (!player && this.pendingRegistrationUsername.get(userId)) {
+      const pendingUsername = this.pendingRegistrationUsername.get(userId)!;
+      if (text === "/skip") {
+        await this.register(message, pendingUsername, pendingUsername);
+        return;
+      }
     }
 
     if (this.pendingCharacterReset.has(userId)) {
@@ -365,40 +491,116 @@ export class BotApp {
     }
 
     if (!player) {
-      await this.register(message, text);
+      const pendingUsername = this.pendingRegistrationUsername.get(userId);
+      if (pendingUsername === "") {
+        if (!this.validNickname(text)) {
+          await this.messenger.sendMessage(message.chat.id, "Username должен быть одним словом и содержать только буквы, цифры или _. Попробуйте снова.");
+          return;
+        }
+        if (findByNickname(state, text)) {
+          await this.messenger.sendMessage(message.chat.id, "Этот username уже занят. Выберите другой.");
+          return;
+        }
+        this.pendingRegistrationUsername.set(userId, text);
+        await this.messenger.sendMessage(message.chat.id, "Username сохранён. Теперь введите ваше настоящее имя или /skip.");
+      } else if (pendingUsername) {
+        await this.register(message, pendingUsername, text === "/skip" ? pendingUsername : text);
+      } else {
+        await this.register(message, text);
+      }
       return;
     }
 
     const actions: Record<string, () => Promise<void>> = {
-      "👤 Мой персонаж": () => this.messenger.sendMessage(message.chat.id, profile(player, state), MENU),
-      "🏘 Мой barrio": () => this.showBarrio(message.chat.id, player),
-      "🎯 Текущая misión": () => this.messenger.sendMessage(message.chat.id, missionText(state), MENU),
-      "📋 Все misiones": () => this.messenger.sendMessage(message.chat.id, missionsText(state, parseAdminIds().has(userId), player), MENU),
-      "🏆 Общий рейтинг": () => this.messenger.sendMessage(message.chat.id, generalRanking(state), MENU),
-      "📊 Рейтинг barrios": () => this.messenger.sendMessage(message.chat.id, barrioRanking(state), MENU),
-      "🛒 Mercado": () => this.messenger.sendMessage(message.chat.id, marketText(state), MENU),
-      "🗺 Территории": () => this.showTerritories(message.chat.id),
-      "📚 Словарь": () => this.messenger.sendMessage(message.chat.id, dictionaryText(), MENU),
-      "🎭 События": () => this.messenger.sendMessage(message.chat.id, eventsText(state, player), MENU),
-      "📜 Правила": () => this.messenger.sendMessage(message.chat.id, rules(), MENU),
-      "🗑 Перезапустить персонажа": async () => {
-        this.pendingCharacterReset.add(userId);
-        await this.messenger.sendMessage(
-          message.chat.id,
-          "⚠️ Это удалит персонажа, Dinero, Respeto, инвентарь, участие в misiones и статус лидера.\n\nВведите код подтверждения или отправьте /cancel.",
-          MENU,
-        );
-      },
+      "👤 Мой персонаж": () => this.messenger.sendMessage(message.chat.id, profile(player, state), characterKeyboard()),
+      "📋 Misiones": () => this.messenger.sendMessage(message.chat.id, menuMissionsText(state, player), missionKeyboard(state, player)),
+      "📊 Ratings": () => this.messenger.sendMessage(message.chat.id, "📊 <b>Ratings</b>\nВыберите нужный рейтинг:", ratingsKeyboard()),
+      "🎲 Side quests": () => this.messenger.sendMessage(message.chat.id, "🎲 <b>Side quests</b>\nВыберите дополнительный раздел:", sideQuestsKeyboard()),
+      "📚 Словарь": () => this.messenger.sendMessage(message.chat.id, dictionaryText(state), vocabularyKeyboard(state)),
+      "ℹ️ Информация": () => this.messenger.sendMessage(message.chat.id, informationText(state), MENU),
+      "⚙️ Настройки": () => this.messenger.sendMessage(message.chat.id, "⚙️ <b>Настройки</b>", settingsKeyboard()),
     };
     const action = actions[text];
     if (action) await action();
     else await this.messenger.sendMessage(message.chat.id, "Используйте кнопки меню или /help.", MENU);
   }
 
-  private async register(message: TelegramMessage, rawNickname: string): Promise<void> {
-    const nickname = rawNickname.trim().replace(/\s+/g, " ");
-    if (nickname.length < 2 || nickname.length > 24 || /[<>\n\r]/.test(nickname)) {
-      await this.messenger.sendMessage(message.chat.id, "Nickname должен содержать 2–24 символа. Попробуйте другой.");
+  async handleCallback(query: TelegramCallbackQuery): Promise<void> {
+    const chat = query.message?.chat;
+    if (!chat || chat.type !== "private") return;
+    await this.ensureTerritories();
+    const state = this.store.get();
+    const player = findPlayer(state, query.from.id);
+    if (!player) {
+      await this.messenger.answerCallbackQuery(query.id, "Сначала зарегистрируйтесь через /start.");
+      return;
+    }
+    const [action, missionId] = (query.data ?? "").split(":");
+    if (action === "mission_join" && missionId) {
+      await this.messenger.answerCallbackQuery(query.id, "Обрабатываю запись…");
+      await this.joinMission(chat.id, player, missionId);
+      return;
+    }
+    if (action === "mission_leave" && missionId) {
+      await this.messenger.answerCallbackQuery(query.id, "Отменяю запись…");
+      await this.leaveMission(chat.id, player, missionId);
+      return;
+    }
+    if (action === "vocab" && missionId) {
+      await this.messenger.answerCallbackQuery(query.id);
+      if (missionId === "basics") await this.messenger.sendMessage(chat.id, basicsText(), vocabularyKeyboard(state));
+      else {
+        const mission = state.missions.find((item) => item.id === missionId);
+        if (mission) await this.messenger.sendMessage(chat.id, `📚 <b>Vocabulary: ${escapeHtml(mission.title)}</b>\nВыберите раздел:`, missionVocabularyKeyboard(mission));
+      }
+      return;
+    }
+    if ((action === "vocab_words" || action === "vocab_phrases") && missionId) {
+      const mission = state.missions.find((item) => item.id === missionId);
+      await this.messenger.answerCallbackQuery(query.id);
+      if (mission) await this.messenger.sendMessage(chat.id, action === "vocab_words" ? missionVocabularyText(mission) : missionPhrasesText(mission), missionVocabularyKeyboard(mission));
+      return;
+    }
+    if (action === "ratings") {
+      await this.messenger.answerCallbackQuery(query.id);
+      await this.messenger.sendMessage(chat.id, missionId === "barrios" ? barrioRanking(state) : generalRanking(state), MENU);
+      return;
+    }
+    if (action === "side") {
+      await this.messenger.answerCallbackQuery(query.id);
+      if (missionId === "menu") await this.messenger.sendMessage(chat.id, "🎲 <b>Side quests</b>\nВыберите дополнительный раздел:", sideQuestsKeyboard());
+      else if (missionId === "events") await this.messenger.sendMessage(chat.id, eventsText(state, player), MENU);
+      else await this.messenger.sendMessage(chat.id, marketText(state), MENU);
+      return;
+    }
+    if (action === "character") {
+      await this.messenger.answerCallbackQuery(query.id);
+      if (missionId === "barrio") await this.showBarrio(chat.id, player);
+      else if (missionId === "territories") await this.showTerritories(chat.id);
+      return;
+    }
+    if (action === "settings" && missionId === "reset") {
+      this.pendingCharacterReset.add(query.from.id);
+      await this.messenger.answerCallbackQuery(query.id, "Открываю сброс персонажа…");
+      await this.messenger.sendMessage(chat.id, "⚠️ Это удалит персонажа, Dinero, Respeto, инвентарь, участие в misiones и статус лидера.\n\nВведите код подтверждения или отправьте /cancel.", MENU);
+      return;
+    }
+    await this.messenger.answerCallbackQuery(query.id);
+  }
+
+  private validNickname(value: string): boolean {
+    return value.length >= 2 && value.length <= 24 && /^[\p{L}\p{N}_]+$/u.test(value);
+  }
+
+  private async register(message: TelegramMessage, rawNickname: string, rawRealName = rawNickname): Promise<void> {
+    const nickname = rawNickname.trim();
+    const realName = rawRealName.trim().replace(/\s+/g, " ");
+    if (!this.validNickname(nickname)) {
+      await this.messenger.sendMessage(message.chat.id, "Username должен быть одним словом и содержать только буквы, цифры или _. Попробуйте другой.");
+      return;
+    }
+    if (realName.length < 2 || realName.length > 80 || /[<>\n\r]/.test(realName)) {
+      await this.messenger.sendMessage(message.chat.id, "Настоящее имя должно содержать 2–80 символов. Попробуйте снова.");
       return;
     }
     if (findByNickname(this.store.get(), nickname)) {
@@ -406,24 +608,15 @@ export class BotApp {
       return;
     }
 
-    const existing = this.store.get().players.filter((p) => p.role === "player" && p.barrioId).map((p) => ({ playerId: String(p.telegramId), barrioId: p.barrioId!, moveCount: p.moveCount }));
-    const result = assignPlayer(String(message.from!.id), existing, gameConfig);
-    const ownAssignment = result.assignments.find((item) => item.playerId === String(message.from!.id));
     const now = new Date().toISOString();
     await this.store.update((state) => {
-      for (const assignment of result.assignments) {
-        const registered = state.players.find((p) => String(p.telegramId) === assignment.playerId);
-        if (registered) {
-          registered.barrioId = assignment.barrioId;
-          registered.moveCount = assignment.moveCount ?? registered.moveCount;
-        }
-      }
       state.players.push({
         telegramId: message.from!.id,
         chatId: message.chat.id,
         nickname,
+        realName,
         nicknameKey: nicknameKey(nickname),
-        barrioId: ownAssignment?.barrioId ?? gameConfig.barrios[0].id,
+        barrioId: null,
         role: "player",
         dinero: gameConfig.economy.startingPlayerDinero,
         respeto: gameConfig.economy.startingRespeto,
@@ -434,17 +627,14 @@ export class BotApp {
         registeredAt: now,
       });
       for (const barrio of gameConfig.barrios) {
-        state.barrioDinero[barrio.id] ??= gameConfig.economy.startingBarrioDinero;
+        state.barrioMoney[barrio.id] ??= gameConfig.economy.startingBarrioMoney;
       }
       if (!state.market.length) state.market = structuredClone(gameConfig.market);
     });
+    this.pendingRegistrationUsername.delete(message.from!.id);
 
     const added = findPlayer(this.store.get(), message.from!.id)!;
     await this.messenger.sendMessage(message.chat.id, `Регистрация завершена!\n\n${profile(added, this.store.get())}`, MENU);
-    for (const movedId of result.movedPlayerIds) {
-      const moved = findPlayer(this.store.get(), Number(movedId));
-      if (moved) await this.messenger.sendMessage(moved.chatId, `⚠️ Открылся новый barrio. Для баланса вы переведены в ${barrioLabel(moved.barrioId)}. Это назначение уже сохранено.`);
-    }
   }
 
   private async showBarrio(chatId: number, player: Player): Promise<void> {
@@ -463,12 +653,17 @@ export class BotApp {
       return;
     }
     const appointedLeader = findPlayer(state, state.barrioLeaderIds[barrio.id]);
+    const characterName = state.barrioCharacterNames[barrio.id] ?? barrio.leader.name;
     const leaderDetails = appointedLeader
-      ? `👑 Лидер barrio: <b>${escapeHtml(appointedLeader.nickname)}</b>\n🎭 Персонаж: ${escapeHtml(barrio.leader.name)}`
-      : `👑 Лидер: <b>${escapeHtml(barrio.leader.name)}</b>`;
-    const details = `${barrio.emoji} <b>${escapeHtml(barrio.name)}</b>\n${escapeHtml(barrio.slogan)}\n${leaderDetails}\nЦвет: <code>${barrio.color}</code>`;
+      ? `👑 Лидер barrio: <b>${escapeHtml(appointedLeader.nickname)}</b>${appointedLeader.realName ? ` [${escapeHtml(appointedLeader.realName)}]` : ""}`
+      : `👑 Лидер: <b>${escapeHtml(characterName)}</b>`;
+    const territories = TERRITORIES.flatMap((name, index) => state.territories[String(index + 1)] === barrio.id ? [name] : []);
+    const territoryDetails = territories.length ? territories.map(escapeHtml).join(", ") : "нет";
+    const details = `${barrio.emoji} <b>${escapeHtml(barrio.name)}</b>\n${escapeHtml(barrio.slogan)}\n${leaderDetails}\nЦвет: <code>${barrio.color}</code>\n🗺 Территории: ${territoryDetails}`;
     const photo = state.leaderPhotoFileIds[barrio.id];
-    if (photo && !barrio.leader.hidePhoto) await this.messenger.sendPhoto(chatId, photo, details);
+    if (photo && !barrio.leader.hidePhoto) {
+      await this.messenger.sendPhoto(chatId, photo, details);
+    }
     else {
       const photoStatus = barrio.leader.hidePhoto ? "" : "\n📷 Фото лидера пока не загружено организатором.";
       await this.messenger.sendMessage(chatId, `${details}${photoStatus}`, MENU);
@@ -509,14 +704,14 @@ export class BotApp {
     if (!player && !["/admin"].includes(command)) return false;
     if (command === "/profile") await this.messenger.sendMessage(message.chat.id, profile(player!, state), MENU);
     else if (command === "/mission") await this.messenger.sendMessage(message.chat.id, missionText(state), MENU);
-    else if (command === "/missions") await this.messenger.sendMessage(message.chat.id, missionsText(state, isAdmin, player!), MENU);
+    else if (command === "/missions") await this.messenger.sendMessage(message.chat.id, menuMissionsText(state, player!), missionKeyboard(state, player!));
     else if (command === "/missionjoin") await this.joinMission(message.chat.id, player!, argument);
     else if (command === "/missionleave") await this.leaveMission(message.chat.id, player!, argument);
     else if (command === "/events") await this.messenger.sendMessage(message.chat.id, eventsText(state, player!), MENU);
     else if (command === "/ranking") await this.messenger.sendMessage(message.chat.id, generalRanking(state), MENU);
     else if (command === "/barrios") await this.messenger.sendMessage(message.chat.id, barrioRanking(state), MENU);
     else if (command === "/market") await this.messenger.sendMessage(message.chat.id, marketText(state), MENU);
-    else if (command === "/dictionary" || command === "/dict") await this.messenger.sendMessage(message.chat.id, dictionaryText(), MENU);
+    else if (command === "/dictionary" || command === "/dict") await this.messenger.sendMessage(message.chat.id, dictionaryText(state), vocabularyKeyboard(state));
     else if (command === "/territories" || command === "/map") await this.showTerritories(message.chat.id);
     else if (command === "/buy") await this.buy(message.chat.id, player!, argument);
     else if (command === "/restart") {
@@ -810,25 +1005,6 @@ export class BotApp {
     if (command.startsWith("/shop")) {
       return this.handleMarketAdmin(chatId, command, argument);
     }
-    if (command === "/mission") {
-      const [meetingAt, title, description] = argument.split("|").map((value) => value.trim());
-      if (!meetingAt || !title || !description || Number.isNaN(Date.parse(meetingAt))) {
-        await this.messenger.sendMessage(chatId, "Формат: /mission 2026-09-12T18:00:00+03:00 | Название | Описание");
-      } else {
-        await this.store.update((s) => {
-          s.mission = {
-            meetingAt,
-            title,
-            description,
-            location: gameConfig.event.location,
-            vocabulary: s.mission?.vocabulary ?? gameConfig.event.currentMission.vocabulary,
-            examples: s.mission?.examples ?? gameConfig.event.currentMission.examples,
-          };
-        });
-        await this.messenger.sendMessage(chatId, "Misión обновлена.");
-      }
-      return true;
-    }
     if (command === "/shopadd") {
       const [id, name, priceRaw, description] = argument.split("|").map((value) => value.trim());
       const price = Number(priceRaw);
@@ -1017,6 +1193,7 @@ export class BotApp {
           location: location || gameConfig.event.location,
           status: existing?.status ?? "draft",
           vocabulary: existing?.vocabulary ?? [],
+          phrases: existing?.phrases ?? [],
           examples: existing?.examples ?? [],
           rewardDinero: existing?.rewardDinero,
           rewardRespeto: existing?.rewardRespeto,
@@ -1040,7 +1217,6 @@ export class BotApp {
       }
       await this.store.update((s) => {
         mission.meetingAt = meetingAt;
-        if (s.activeMissionId === mission.id && s.mission) s.mission.meetingAt = meetingAt;
       });
       await this.messenger.sendMessage(
         chatId,
@@ -1077,7 +1253,6 @@ export class BotApp {
           for (const item of s.missions) if (item.status === "active") item.status = "completed";
           mission.status = "active";
           s.activeMissionId = mission.id;
-          s.mission = mission;
         });
         await this.broadcast(`🔔 Началась новая misión!\n\n${missionText(state)}`);
         await this.messenger.sendMessage(chatId, "Misión активирована и отправлена игрокам.");
@@ -1092,7 +1267,6 @@ export class BotApp {
           mission.status = "completed";
           if (s.activeMissionId === mission.id) {
             s.activeMissionId = null;
-            s.mission = null;
           }
         });
         await this.messenger.sendMessage(chatId, "Misión завершена.");
@@ -1107,7 +1281,6 @@ export class BotApp {
           const [removed] = s.missions.splice(index, 1);
           if (s.activeMissionId === removed.id) {
             s.activeMissionId = null;
-            s.mission = null;
           }
         });
         await this.messenger.sendMessage(chatId, "Misión удалена.");

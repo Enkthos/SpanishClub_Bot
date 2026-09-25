@@ -6,6 +6,7 @@ export type Player = {
   telegramId: number;
   chatId: number;
   nickname: string;
+  realName?: string;
   nicknameKey: string;
   barrioId: string | null;
   role: "player" | "police";
@@ -26,7 +27,14 @@ export type MissionState = {
   rewardDinero?: number;
   rewardRespeto?: number;
   vocabulary?: VocabularyEntry[];
+  phrases?: MissionPhrase[];
   examples?: string[];
+};
+
+export type MissionPhrase = {
+  text: string;
+  translation?: string;
+  notes?: string;
 };
 
 export type MissionRecord = MissionState & {
@@ -60,30 +68,32 @@ export type GameEvent = {
 
 export type GameState = {
   players: Player[];
-  mission: MissionState | null;
   missions: MissionRecord[];
   activeMissionId: string | null;
   events: GameEvent[];
   market: MarketItem[];
-  barrioDinero: Record<string, number>;
+  barrioMoney: Record<string, number>;
   barrioLeaderIds: Record<string, number>;
+  barrioCharacterNames: Record<string, string>;
   leaderPhotoFileIds: Record<string, string>;
   mapPhotoFileId: string | null;
   territories: Record<string, string | null>;
   penaltyCatalog: PenaltyDefinition[];
   notifications: NotificationLog[];
+  botInformation?: string;
+  botRules?: string;
 };
 
 export function emptyState(): GameState {
   return {
     players: [],
-    mission: null,
     missions: [],
     activeMissionId: null,
     events: [],
     market: [],
-    barrioDinero: {},
+    barrioMoney: {},
     barrioLeaderIds: {},
+    barrioCharacterNames: {},
     leaderPhotoFileIds: {},
     mapPhotoFileId: null,
     territories: {},
@@ -111,16 +121,18 @@ export class JsonStore {
       this.state.activeMissionId ??= null;
       this.state.events ??= [];
       this.state.barrioLeaderIds ??= {};
+      this.state.barrioCharacterNames ??= {};
+      const legacyState = this.state as GameState & { barrioDinero?: Record<string, number> };
+      this.state.barrioMoney ??= legacyState.barrioDinero ?? {};
+      delete legacyState.barrioDinero;
       this.state.penaltyCatalog ??= [];
       this.state.notifications ??= [];
-      if (this.state.mission && this.state.missions.length === 0) {
-        this.state.missions.push({ id: "legacy", status: "active", participantIds: [], barrioAssignments: {}, participantRegisteredAt: {}, ...this.state.mission });
-        this.state.activeMissionId = "legacy";
-      }
       for (const mission of this.state.missions) {
         mission.participantIds ??= [];
         mission.barrioAssignments ??= {};
         mission.participantRegisteredAt ??= Object.fromEntries(mission.participantIds.map((id) => [String(id), ""]));
+        mission.vocabulary ??= [];
+        mission.phrases ??= [];
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

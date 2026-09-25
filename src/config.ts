@@ -11,8 +11,8 @@ export function validateConfig(value: unknown): GameConfig {
   if (!config || typeof config !== "object") fail("root must be an object");
   if (!config.locale) fail("locale is required");
   if (!config.timeZone) fail("timeZone is required");
-  if (!config.event?.name || !config.event.meetingAt || !config.event.currentMission?.title) {
-    fail("event name, meetingAt and current mission are required");
+  if (!config.event?.name || !config.event.meetingAt || !config.event.location) {
+    fail("event name, meetingAt and location are required");
   }
   if (Number.isNaN(Date.parse(config.event.meetingAt))) fail("event meetingAt must be an ISO date");
   if (!config.economy || config.economy.startingPlayerDinero < 0 || config.economy.startingRespeto < 0) {

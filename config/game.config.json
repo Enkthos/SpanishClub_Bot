@@ -4,33 +4,11 @@
   "event": {
     "name": "LOS BARRIOS",
     "meetingAt": "2026-09-12T18:00:00+03:00",
-    "location": "Место будет объявлено организатором",
-    "currentMission": {
-      "title": "La presentación",
-      "description": "Познакомься минимум с тремя людьми из других Barrios. Используй: Hola, Me llamo…, ¿Cómo te llamas?, Soy de…, Mucho gusto.",
-      "vocabulary": [
-        { "spanish": "Hola", "russian": "Привет" },
-        { "spanish": "Me llamo…", "russian": "Меня зовут…" },
-        { "spanish": "¿Cómo te llamas?", "russian": "Как тебя зовут?" },
-        { "spanish": "Soy de…", "russian": "Я из… / Я представляю…" },
-        { "spanish": "Mucho gusto", "russian": "Очень приятно" },
-        { "spanish": "¿Qué sabes?", "russian": "Что ты знаешь?" },
-        { "spanish": "No sé", "russian": "Я не знаю" }
-      ],
-      "examples": [
-        "Подойди минимум к трём игрокам из других Barrios.",
-        "Представься: «Hola. Me llamo … Soy de Los Nómadas».",
-        "Спроси имя: «¿Cómo te llamas?» и ответь «Mucho gusto».",
-        "Попробуй выяснить секретный código, используя «¿Qué sabes?».",
-        "Запомни имена собеседников и передай информацию своему Barrio."
-      ],
-      "rewardDinero": 0,
-      "rewardRespeto": 2
-    }
+    "location": "Место будет объявлено организатором"
   },
   "economy": {
     "startingPlayerDinero": 0,
-    "startingBarrioDinero": 1000,
+    "startingBarrioMoney": 1000,
     "startingRespeto": 0
   },
   "dictionary": [
@@ -157,7 +135,7 @@
       "slogan": "Энергия, риск, харизма",
       "color": "#D62828",
       "emoji": "🔴",
-      "leader": { "name": "Salvador", "hidePhoto": true }
+      "leader": { "name": "Salvador"}
     },
     {
       "id": "panteras",

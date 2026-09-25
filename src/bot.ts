@@ -86,6 +86,13 @@ while (!stopping) {
           }
         }
       }
+      if (update.callback_query) {
+        try {
+          await app.handleCallback(update.callback_query);
+        } catch (error) {
+          console.error(`Callback ${update.callback_query.id} failed: ${errorSummary(error)}`);
+        }
+      }
     }
   } catch (error) {
     if (error instanceof TelegramApiError && error.errorCode === 409) {

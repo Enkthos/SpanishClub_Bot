@@ -27,11 +27,10 @@ export type GameConfig = {
     name: string;
     meetingAt: string;
     location: string;
-    currentMission: Omit<Mission, "meetingAt" | "location">;
   };
   economy: {
     startingPlayerDinero: number;
-    startingBarrioDinero: number;
+    startingBarrioMoney: number;
     startingRespeto: number;
   };
   dictionary: {
