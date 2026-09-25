@@ -184,9 +184,12 @@ function menuMissionsText(state: GameState, player: Player): string {
 
 function missionKeyboard(state: GameState, player: Player): InlineKeyboardMarkup {
   const rows = menuMissions(state)
-    .map((mission) => mission.participantIds.includes(player.telegramId)
-      ? [{ text: `➖ Отменить: ${mission.title}`, callback_data: `mission_leave:${mission.id}` }]
-      : [{ text: `➕ Записаться: ${mission.title}`, callback_data: `mission_join:${mission.id}` }]);
+    .map((mission) => [
+      mission.participantIds.includes(player.telegramId)
+        ? { text: `➖ Отменить: ${mission.title}`, callback_data: `mission_leave:${mission.id}` }
+        : { text: `➕ Записаться: ${mission.title}`, callback_data: `mission_join:${mission.id}` },
+      { text: "ℹ️ Полная информация", callback_data: `mission_info:${mission.id}` },
+    ]);
   rows.push([{ text: "🎲 Side quests", callback_data: "side:menu" }]);
   return { inline_keyboard: rows };
 }
@@ -536,6 +539,18 @@ export class BotApp {
       return;
     }
     const [action, missionId] = (query.data ?? "").split(":");
+    if (action === "mission_info" && missionId) {
+      await this.messenger.answerCallbackQuery(query.id);
+      const mission = state.missions.find((item) => item.id === missionId);
+      if (mission) {
+        await this.messenger.sendMessage(chat.id, formatMission(
+          { ...mission, meetingAt: new Date(mission.meetingAt) },
+          gameConfig.locale,
+          gameConfig.timeZone,
+        ));
+      }
+      return;
+    }
     if (action === "mission_join" && missionId) {
       await this.messenger.answerCallbackQuery(query.id, "Обрабатываю запись…");
       await this.joinMission(chat.id, player, missionId);

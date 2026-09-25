@@ -193,6 +193,15 @@ describe("Telegram conversation", () => {
       expect(response?.text).toContain("20 сентября 2026 г.");
     const missionMarkup = response?.replyMarkup as InlineKeyboardMarkup;
     expect(missionMarkup.inline_keyboard.flat().map((item) => item.text)).toContain("➕ Записаться: Introducción");
+    expect(missionMarkup.inline_keyboard.flat().map((item) => item.text)).toContain("ℹ️ Полная информация");
+
+    await app.handleCallback({
+      id: "callback-info",
+      from: { id: 101, first_name: "User 101" },
+      data: "mission_info:intro",
+      message: { chat: { id: 101, type: "private" } },
+    });
+    expect(messenger.messages.at(-1)?.text).toContain("Primera misión");
   });
 
   it("lets a player subscribe to a mission with an inline button", async () => {
